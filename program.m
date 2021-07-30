@@ -1,36 +1,35 @@
+
 clc
 close all
 clear all
-VideoFile = VideoReader('challenge.mp4');
+video = VideoReader('project_video.mp4');
 load('roi_variables', 'c', 'r');
-Output_Video=VideoWriter('output_video');
-Output_Video.FrameRate= 25;
-open(Output_Video);
 
-while hasFrame(VideoFile)    
-    frame = readFrame(VideoFile);    
+
+while hasFrame(video)    
+    frame = readFrame(video);    
     frame = imgaussfilt3(frame);
     %figure('Name','Filtered Image'), imshow(frame);
-    channel1MinY = 130;
-    channel1MaxY = 255;
-    channel2MinY = 130;
-    channel2MaxY = 255;
-    channel3MinY = 0;
-    channel3MaxY = 130;
-    Yellow=((frame(:,:,1)>=channel1MinY)|(frame(:,:,1)<=channel1MaxY))& ...
-        (frame(:,:,2)>=channel2MinY)&(frame(:,:,2)<=channel2MaxY)&...
-        (frame(:,:,3)>=channel3MinY)&(frame(:,:,3)<=channel3MaxY);    
+    redYmin = 130;
+    redYmax = 255;
+    greenYmin = 130;
+    greenYmax = 255;
+    blueYmin = 0;
+    blueYmax = 130;
+    Yellow=((frame(:,:,1)>=redYmin)|(frame(:,:,1)<=redYmax))& ...
+        (frame(:,:,2)>=greenYmin)&(frame(:,:,2)<=greenYmax)&...
+        (frame(:,:,3)>=blueYmin)&(frame(:,:,3)<=blueYmax);    
     %figure('Name','Yellow Mask'), imshow(Yellow);
     
-    channel1MinW = 200;
-    channel1MaxW = 255;
-    channel2MinW = 200;
-    channel2MaxW = 255;
-    channel3MinW = 200;
-    channel3MaxW = 255;
-    White=((frame(:,:,1)>=channel1MinW)|(frame(:,:,1)<=channel1MaxW))&...
-        (frame(:,:,2)>=channel2MinW)&(frame(:,:,2)<=channel2MaxW)& ...
-        (frame(:,:,3)>=channel3MinW)&(frame(:,:,3)<=channel3MaxW);    
+    redWmin = 200;
+    redWmax = 255;
+    greenWmin = 200;
+    greenWmax = 255;
+    blueWmin = 200;
+    blueWmax = 255;
+    White=((frame(:,:,1)>=redWmin)|(frame(:,:,1)<=redWmax))&...
+        (frame(:,:,2)>=greenWmin)&(frame(:,:,2)<=greenWmax)& ...
+        (frame(:,:,3)>=blueWmin)&(frame(:,:,3)<=blueWmax);    
    %figure('Name','White Mask'), imshow(White);
 
     frameW = edge(White, 'canny', 0.2);
@@ -78,7 +77,7 @@ while hasFrame(VideoFile)
     lines_Y = houghlines(frame_roiY,theta_Y,rho_Y,P_Y,'FillGap',3000,'MinLength',20);  
     lines_W = houghlines(frame_roiW,theta_W,rho_W,P_W,'FillGap',3000,'MinLength',20);
        
-    %-----------------Extract start and end points of lines---------------- 
+    %Extract start and end points of lines
     
     leftp1 = [lines_Y(1).point1; lines_Y(1).point2];
     leftp2 = [lines_Y(2).point1; lines_Y(2).point2];  
@@ -110,12 +109,12 @@ while hasFrame(VideoFile)
         right_plot(2,:) = rightp2(2,:);
     end
     
-    %----------------Calculate slope of left and right lines---------------
+    %Calculate slope of left and right lines
     
     slopeL = (left_plot(2,2)-left_plot(1,2))/(left_plot(2,1)-left_plot(1,1));
     slopeR = (right_plot(2,2)-right_plot(1,2))/(right_plot(2,1)-right_plot(1,1));
 
-    %------Make equations of left and right lines to extrapolate them------
+    %Make equations of left and right lines to extrapolate them
     
     xLeftY = 1; 
     yLeftY = slopeL * (xLeftY - left_plot(1,1)) + left_plot(1,2);
@@ -127,11 +126,11 @@ while hasFrame(VideoFile)
     xRightW = 1300; 
     yRightW = slopeR * (xRightW - right_plot(2,1)) + right_plot(2,2);
     
-    %------Making a transparent Trapezoid between 4 poits of 2 lines-------
+    %Making a transparent Trapezoid between 4 poits of 2 lines
     
     points = [xLeftY yLeftY; xRightY yRightY ;xLeftW yLeftW; xRightW yRightW ];
     number = [1 2 3 4];
-    %------------------Turn Prediction---------------
+    %Turn Prediction
     
     Yellow_dir = cross([left_plot(1,1), left_plot(1,2), 1], [left_plot(2,1), left_plot(2,2), 1]);
     Yellow_dir = Yellow_dir ./ sqrt(Yellow_dir(1)^2 + Yellow_dir(2)^2);
@@ -139,25 +138,19 @@ while hasFrame(VideoFile)
     rho_y = Yellow_dir(3);
     yellow_line = [cos(theta_y), sin(theta_y), rho_y];
     
-    %-------------Finding vanishing point using cross poduct---------------
+    %Finding vanishing point using cross poduct
     white_dir = cross([right_plot(1,1),right_plot(1,2),1], [right_plot(2,1),right_plot(2,2),1]);
     white_dir = white_dir ./ (sqrt(white_dir(1)^2 + white_dir(2)^2));
     theta_w = atan2(white_dir(2),white_dir(1));
     rho_w = white_dir(3);
     white_line = [cos(theta_w), sin(theta_w), rho_w];
     
-    line1 = [0, 1, -left_plot(2,1)];
-    point_on_w_lane = cross(line1,white_line);
-    point_on_w_lane = point_on_w_lane ./ point_on_w_lane(3);
-    line2 = [0, 1, -left_plot(2,2)];
-    point_on_w_lane_2 = cross(line2,white_line);
-    point_on_w_lane_2 = point_on_w_lane_2 ./ point_on_w_lane_2(3);
 
     vanishing_point = cross(yellow_line, white_line);
     vanishing_point = vanishing_point ./ vanishing_point(3);
     vanishing_ratio = vanishing_point(1) / size(frame, 2);
     
-    if vanishing_ratio > 0.47 && vanishing_ratio < 0.49
+    if vanishing_ratio < 0.49 && vanishing_ratio >=0.47
         direction = 'Turn Left';
     elseif vanishing_ratio >= 0.49 && vanishing_ratio <= 0.51
         direction = 'Go Straight';
@@ -165,7 +158,7 @@ while hasFrame(VideoFile)
         direction = 'Turn Right';
     end
       
-    %--Plot the extrapolated lines, Trapezoid and direction on each frame--
+    %Plot the extrapolated lines, Trapezoid and direction on each frame
     
     imshow(frame);
     hold on
@@ -174,7 +167,6 @@ while hasFrame(VideoFile)
     text(650, 65, direction,'horizontalAlignment', 'center', 'Color','red','FontSize',20)
     patch('Faces', number, 'Vertices', points, 'FaceColor','green','Edgecolor','green','FaceAlpha',0.4)
     hold off
+    pause(0.05)
     
-    writeVideo(Output_Video,getframe);
 end
-close(Output_Video)
